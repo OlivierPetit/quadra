@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Affichage des Quadratures</title>
+  <style>
+    body { font-family: sans-serif; }
+    table { border-collapse: collapse; margin-top: 1rem; }
+    td {
+      border: 1px solid #333;
+      padding: 0.5rem 0.8rem;
+      text-align: center;
+      min-width: 3em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- 
+Titre: Affichage des Quadratures
+Description: Ce code JavaScript affiche la quadrature (naturelle ou manifestée) selon l'ordre spécifié,
+en disposant les lignes de droite à gauche et en affichant les cartes de cœur et de carreau en rouge.
+-->
+
+<input type="number" id="inputOrder" value="-1" min="-1" max="89">
+<button onclick="showQuadrature()">Afficher la quadrature</button>
+<br>
+<label for="birthDate">Date de naissance :</label>
+<input type="date" id="birthDate">
+<span id="personalCardDisplay" style="margin-left: 1em; font-weight: bold;"></span>
+<br>
+<div id="output"></div>
+
+<script>
+// --- Disposition de la quadrature naturelle (52 cartes) ---
+// L'ordre naturel est désormais tel que :
+// - Les 49 premières cartes (bloc) vont de l'As de cœur (1) au 10 de pique (49)
+// - La couronne (3 cartes) vient en fin, avec :
+//     Valet de pique = 50, Dame de pique = 51, Roi de cœur = 52.
+const NATURAL_ORDER = [
+  // Bloc (49 cartes) :
+  // Cœurs (1-13)
+  "A♥","2♥","3♥","4♥","5♥","6♥","7♥","8♥","9♥","10♥","V♥","D♥","R♥",
+  // Trèfles (14-26)
+  "A♣","2♣","3♣","4♣","5♣","6♣","7♣","8♣","9♣","10♣","V♣","D♣","R♣",
+  // Carreaux (27-39)
+  "A♦","2♦","3♦","4♦","5♦","6♦","7♦","8♦","9♦","10♦","V♦","D♦","R♦",
+  // Piques (40-49)
+  "A♠","2♠","3♠","4♠","5♠","6♠","7♠","8♠","9♠","10♠",
+  // Couronne (3 cartes) : cartes 50 à 52
+  "V♠","D♠","R♠"
+];
+
+// --- Cartes "fixes" qui ne bougent jamais ---
+const FIXED_CARDS = ["R♠","V♥","8♣"];
+
+// --- Paires à échanger ---
+const SWAPS = [
+  ["2♥","A♣"],
+  ["9♥","7♦"]
+];
+
+// --- Ronde pour les 45 autres cartes ---
+const RONDE = [
+  "3♥","D♣","10♦","D♠","8♦","7♣","V♠","10♣","4♠","4♥","10♠","D♥","9♣","6♦","3♠",
+  "V♦","V♣","10♥","5♠","4♦","5♥","5♣","4♣","6♥","3♦","D♦","9♦","5♦","3♣","R♦",
+  "7♠","8♥","7♥","A♠","2♣","R♥","9♠","6♠","2♠","R♣","8♠","6♣","2♦","A♦","A♥"
+];
+
+// Création d'une table de correspondance pour la transformation de la ronde
+const rondeMap = {};
+for (let i = 0; i < RONDE.length; i++) {
+  const current = RONDE[i];
+  const next = RONDE[(i + 1) % RONDE.length];
+  rondeMap[current] = next;
+}
+
+function getNaturalReadingArray(quad) {
+  return quad;
+}
+
+// Nouvelle fonction pour obtenir l'ordre d'affichage effectif (de droite à gauche, haut en bas)
+function getDisplayedOrder(quad) {
+  const result = [];
+  // Ligne 0 : couronne (3 cartes centrées)
+  const crownRow = ["", "", quad[51], quad[50], quad[49], "", ""];
+  result.push(crownRow);
+  // Lignes 1 à 7 : bloc de 49 cartes (7 lignes de 7 cartes)
+  let index = 0;
+  for (let r = 0; r < 7; r++) {
+    const row = quad.slice(index, index + 7).reverse();
+    result.push(row);
+    index += 7;
+  }
+  return result;
+}
+
+// Applique une transformation unique (de quadrature à quadrature suivante)
+function transformOneStep(arr) {
+  const newArr = [...arr];
+  for (let i = 0; i < 52; i++) {
+    const card = arr[i];
+    // 1. Les cartes fixes ne bougent jamais
+    if (FIXED_CARDS.includes(card)) {
+      newArr[i] = card;
+      continue;
+    }
+    // 2. Échanges définis
+    let swapped = false;
+    for (const [c1, c2] of SWAPS) {
+      if (card === c1) {
+        newArr[i] = c2;
+        swapped = true;
+        break;
+      } else if (card === c2) {
+        newArr[i] = c1;
+        swapped = true;
+        break;
+      }
+    }
+    if (swapped) continue;
+    // 3. Transformation via la ronde
+    newArr[i] = rondeMap[card];
+  }
+  return newArr;
+}
+
+// Calcule la quadrature selon l'ordre indiqué
+// order == -1 -> quadrature naturelle
+// order entre 0 et 89 -> appliquer (order + 1) fois la transformation
+function getQuadrature(order) {
+  if (order === -1) return NATURAL_ORDER;
+  let result = [...NATURAL_ORDER];
+  for (let i = 0; i <= order; i++) {
+    result = transformOneStep(result);
+  }
+  return result;
+}
+
+// Affiche la quadrature dans un tableau HTML en respectant la lecture de droite à gauche
+// et en colorant en rouge les cartes de cœur (♥) et de carreau (♦)
+function showQuadrature() {
+  const order = parseInt(document.getElementById("inputOrder").value, 10);
+  const quad = getQuadrature(order);
+  const displayedOrder = getDisplayedOrder(quad);
+  let highlightCard = [];
+  document.getElementById("personalCardDisplay").textContent = "";
+  const birthValue = document.getElementById("birthDate").value;
+  if (birthValue) {
+    let birthDate = new Date(birthValue);
+    let day = birthDate.getDate();
+    let month = birthDate.getMonth() + 1;
+    let personalNum = 55 - day - 2 * month;
+    if (personalNum < 1) personalNum = 1;
+    if (personalNum > 52) personalNum = 52;
+    // On récupère la carte personnelle dans l'ordre naturel
+    const personalCard = NATURAL_ORDER[personalNum - 1];
+    document.getElementById("personalCardDisplay").textContent = `Carte personnelle : ${personalCard}`;
+    // On cherche sa position dans l'ordre d'affichage
+    const personalIndex = quad.indexOf(personalCard);
+    for (let i = 0; i < 8; i++) {
+      highlightCard.push(quad[(personalIndex + i) % 52]);
+    }
+  }
+  const output = document.getElementById("output");
+  output.innerHTML = "";
+
+  const table = document.createElement("table");
+
+  // Fonction utilitaire pour créer une cellule avec le style approprié
+  function createCell(card) {
+    const td = document.createElement("td");
+    td.textContent = card;
+    if (card.includes("♥") || card.includes("♦")) {
+      td.style.color = "red";
+    }
+    if (highlightCard.includes(card)) {
+      td.style.backgroundColor = "yellow";
+    }
+    return td;
+  }
+
+  for (let r = 0; r < 8; r++) {
+    const row = document.createElement("tr");
+    for (let c = 0; c < 7; c++) {
+      row.appendChild(createCell(displayedOrder[r][c]));
+    }
+    table.appendChild(row);
+  }
+
+  output.appendChild(table);
+}
+</script>
+</body>
+</html>
